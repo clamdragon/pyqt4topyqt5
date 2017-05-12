@@ -1821,9 +1821,7 @@ class PyQt4ToPyQt5(object):
                        .replace(' '+old_mod+'\n', '\n')\
                        .replace(' '+old_mod+'\\', '\\')\
                        .replace(' '+old_mod+' \\', ' \\')
-
-        # Remove empty in between lines
-        return L_SEP.join(l for l in line.split(L_SEP) if l.strip()) + L_SEP
+        return line
 
     def change_import_lines(self, lines):
         """Refactor the import's lines.
@@ -1891,7 +1889,7 @@ class PyQt4ToPyQt5(object):
 
             elif ls_line.startswith('from PyQt4.Qt import '):
                 parts = line.split('import ')
-                core, gui, wdg, pr, md, ogl, cm = self.sort_qt_classes(parts[1])
+                core, gui, wdg, pr, md, ogl = self.sort_qt_classes(parts[1])
                 if core:
                     stcore = "".join([parts[0].replace('PyQt4.Qt ',
                                 'PyQt5.QtCore import '), ', '.join(core)])
@@ -1923,14 +1921,11 @@ class PyQt4ToPyQt5(object):
                                 'PyQt5.QtOpenGL import '), ', '.join(ogl)])
                     txt = self.reindent_import_line(stogl)
                     news.append(txt)
-                if cm:
-                    txt = L_SEP.join(cm) + L_SEP
-                    news.append(txt)
                 set_qstandardpaths(line.split('.Qt')[0])
 
             elif ls_line.startswith('from PyQt4.QtGui '):
                 parts = line.split('import ')
-                core, gui, wdg, pr, md, cm = self.sort_qtgui_classes(parts[1])
+                core, gui, wdg, pr, md = self.sort_qtgui_classes(parts[1])
                 if core:
                     stcore = "".join([parts[0].replace('PyQt4.QtGui ',
                                 'PyQt5.QtCore import '), ', '.join(core)])
@@ -1957,9 +1952,6 @@ class PyQt4ToPyQt5(object):
                     stmd = "".join([parts[0].replace('PyQt4.QtGui ',
                                 'PyQt5.QtMultimedia import '), ', '.join(md)])
                     txt = self.reindent_import_line(stmd)
-                    news.append(txt)
-                if cm:
-                    txt = L_SEP.join(cm) + L_SEP
                     news.append(txt)
                 set_qstandardpaths(line.split('.QtGui')[0])
 
@@ -1994,8 +1986,7 @@ class PyQt4ToPyQt5(object):
         parts = line.split('import ')
         chain = parts[0].replace('PyQt4', 'PyQt5') + 'import '
         end = parts[1].replace('(', '').replace(')', '').replace('\\', '')
-        modules = set([name.strip() for name in end.split(',')
-                       if name.strip()])
+        modules = set([name.strip() for name in end.split(',')])
 
         if 'QtGui' in modules and not self.modified['QtGui']:
             modules.remove('QtGui')
@@ -2033,26 +2024,21 @@ class PyQt4ToPyQt5(object):
         chain -- the classe's names in one line
 
         Returns:
-        Six class lists:
-            QtCore, QtGui, QtWidgets, QtPrintSupport, QtMultimedia, comments
+        Five lists: QtCore, QtGui, QtWidgets, QtPrintSupport and QtMultimedia classes
         """
-        names = [line.strip(',') for line in chain.split(L_SEP)]
+        names = chain.split(',')
         core = []
         gui = []
         widgets = []
         printer = []
         media = []
-        cm = []
         for name in names:
             name = name.replace('\\', '')
-            cls = name.replace('(', '').replace(')', '').strip()
+            cls = name.strip().replace('(', '').replace(')', '')
             if not cls:
                 continue
 
-            if self.is_comment(cls):
-                cm.append(cls)
-
-            elif cls in CLASSES['QtCore']:
+            if cls in CLASSES['QtCore']:
                 core.append(cls)
 
             elif cls in CLASSES['QtWidgets']:
@@ -2071,7 +2057,7 @@ class PyQt4ToPyQt5(object):
                     cls = 'QTransform'
                 gui.append(cls)
 
-        return core, gui, widgets, printer, media, cm
+        return core, gui, widgets, printer, media
 
     def sort_qt_classes(self, chain):
         """
@@ -2081,11 +2067,9 @@ class PyQt4ToPyQt5(object):
         chain -- the classe's names in one line
 
         Returns:
-        Seven class lists:
-            QtCore, QtGui, QtWidgets, QtPrintSupport, QtMultimedia,
-            QtOpenGL, comments
+        Six lists: QtCore, QtGui, QtWidgets, QtPrintSupport, QtMultimedia and QtOpenGL classes
         """
-        core, old_gui, widgets, printer, media, cm = self.sort_qtgui_classes(chain)
+        core, old_gui, widgets, printer, media = self.sort_qtgui_classes(chain)
         gui = []
         opengl = []
         for cls in old_gui:
@@ -2093,7 +2077,7 @@ class PyQt4ToPyQt5(object):
                 opengl.append(cls)
             else:
                 gui.append(cls)
-        return core, gui, widgets, printer, media, opengl, cm
+        return core, gui, widgets, printer, media, opengl
 
     def sort_qtwebkit_classes(self, chain):
         """Sort the classes from a QtWebkit import line.

@@ -3,6 +3,7 @@ pyqt4topyqt5
 
 pyqt4 -> pyqt5
 
+<<<<<<< HEAD
 Convert a source code written for PySide into a valid code for PySide2
 
 Command line args:
@@ -22,3 +23,16 @@ For simple Maya-based PySide to PySide2,
 import module and run:
 
 topyside2.Main(infile, o=outfile)
+=======
+## Usage
+```
+usage: pyqt4topyqt5.py [-h] [--nosubdir] [--followlinks] [-o O]
+                       [--diff [DIFF]] [--diffs] [--nolog] [--nopyqt5]
+                       path
+```
+
+Basic example: porting the content of `pyqt4app` to pyqt5 in the directory `pyqt5app`:
+```
+pyqt4topyqt5.py pyqt4app -o pyqt5app
+```
+>>>>>>> refs/remotes/rferrazz/master

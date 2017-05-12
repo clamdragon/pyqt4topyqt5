@@ -59,7 +59,7 @@ def diff_parenthesis(line):
 
 
 class PySideToPySide2(object):
-    def __init__(self, source, dest, log, nopyside2):
+    def __init__(self, source, dest, log, nopyside2, backCompat):
         self.log = log
         self.source = source
         self.dest = dest
@@ -69,6 +69,12 @@ class PySideToPySide2(object):
         self._has_qtwidget_import = False
         self._added_pysideSignal = False
         self._pyside2 = not nopyside2
+
+        # BK: backwards compatibility can be maintained with the Qt.py module
+        if backCompat:
+            self.newMod = "Qt"
+        else:
+            self.newMod = "PySide2"
 
     def setup(self):
         self.print_('Processing file: `%s`' % self.source)
@@ -1840,7 +1846,7 @@ class PySideToPySide2(object):
                        .replace(' '+old_mod+' \\', ' \\')
         return line
 
-    def change_import_lines(self, lines):
+    def change_import_lines(self, lines, backCompat=False):
         """Refactor the import's lines.
 
         Args:
@@ -1849,11 +1855,15 @@ class PySideToPySide2(object):
         Returns:
         list(lines)
         """
+
+        # regex
+        # '[\w. ]*PySide2[\w. ]*'
+
         news = []
         count = 0
         def set_qstandardpaths(txt):
             if self.modified['QStandardPaths']:
-                news.append(txt.replace('PySide', 'PySide2') + '.QtCore import QStandardPaths\n')
+                news.append(txt.replace('PySide', '{0}'.format(self.newMod)) + '.QtCore import QStandardPaths\n')
                 self.modified['QStandardPaths'] = False
 
         while count < len(lines):
@@ -1888,14 +1898,14 @@ class PySideToPySide2(object):
                 continue
 
             if ls_line.startswith('from PySide.QtCore ') and self.modified['QStandardPaths']:
-                news.append(line.replace('PySide', 'PySide2').rstrip() + ', QStandardPaths\n')
+                news.append(line.replace('PySide', '{0}'.format(self.newMod)).rstrip() + ', QStandardPaths\n')
                 self.modified['QStandardPaths'] = False
 
             elif ls_line.startswith('from PySide.QtCore ') and 'QChar' in line:
                 elems = [c.strip() for c in line[25:].split(',')]
                 elems.remove('QChar')
                 if elems:
-                    news.append('from PySide2.QtCore import ' + ', '.join(elems) + '\n')
+                    news.append('from {0}.QtCore import '.format(self.newMod) + ', '.join(elems) + '\n')
 
             elif ls_line.startswith('from PySide import '):
                 line = self.refactor_modules_import(line)
@@ -1909,33 +1919,33 @@ class PySideToPySide2(object):
                 core, gui, wdg, pr, md, ogl = self.sort_qt_classes(parts[1])
                 if core:
                     stcore = "".join([parts[0].replace('PySide.Qt ',
-                                'PySide2.QtCore import '), ', '.join(core)])
+                                '{0}.QtCore import '.format(self.newMod)), ', '.join(core)])
                     txt = self.reindent_import_line(stcore)
                     news.append(txt)
                 if gui:
                     stgui = "".join([parts[0].replace('PySide.Qt ',
-                                'PySide2.QtGui import '), ', '.join(gui)])
+                                '{0}.QtGui import '.format(self.newMod)), ', '.join(gui)])
                     txt = self.reindent_import_line(stgui)
                     news.append(txt)
                 if wdg:
                     stwdg = "".join([parts[0].replace('PySide.Qt ',
-                                'PySide2.QtWidgets import '), ', '.join(wdg)])
+                                '{0}.QtWidgets import '.format(self.newMod)), ', '.join(wdg)])
                     txt = self.reindent_import_line(stwdg)
                     news.append(txt)
                     self._has_qtwidget_import = True
                 if pr:
                     stpr = "".join([parts[0].replace('PySide.Qt ',
-                                'PySide2.QtPrintSupport import '), ', '.join(pr)])
+                                '{0}.QtPrintSupport import '.format(self.newMod)), ', '.join(pr)])
                     txt = self.reindent_import_line(stpr)
                     news.append(txt)
                 if md:
                     stmd = "".join([parts[0].replace('PySide.Qt ',
-                                'PySide2.QtMultimedia import '), ', '.join(md)])
+                                '{0}.QtMultimedia import '.format(self.newMod)), ', '.join(md)])
                     txt = self.reindent_import_line(stmd)
                     news.append(txt)
                 if ogl:
                     stogl = "".join([parts[0].replace('PySide.Qt ',
-                                'PySide2.QtOpenGL import '), ', '.join(ogl)])
+                                '{0}.QtOpenGL import '.format(self.newMod)), ', '.join(ogl)])
                     txt = self.reindent_import_line(stogl)
                     news.append(txt)
                 set_qstandardpaths(line.split('.Qt')[0])
@@ -1945,29 +1955,29 @@ class PySideToPySide2(object):
                 core, gui, wdg, pr, md = self.sort_qtgui_classes(parts[1])
                 if core:
                     stcore = "".join([parts[0].replace('PySide.QtGui ',
-                                'PySide2.QtCore import '), ', '.join(core)])
+                                '{0}.QtCore import '.format(self.newMod)), ', '.join(core)])
                     txt = self.reindent_import_line(stcore)
                     self._has_qtwidget_import = True
                     news.append(txt)
                 if gui:
-                    stgui = "".join([parts[0].replace('PySide', 'PySide2'),
+                    stgui = "".join([parts[0].replace('PySide', '{0}'.format(self.newMod)),
                                 'import ', ', '.join(gui)])
                     txt = self.reindent_import_line(stgui)
                     news.append(txt)
                 if wdg:
                     stwdg = "".join([parts[0].replace('PySide.QtGui ',
-                                'PySide2.QtWidgets import '), ', '.join(wdg)])
+                                '{0}.QtWidgets import '.format(self.newMod)), ', '.join(wdg)])
                     txt = self.reindent_import_line(stwdg)
                     self._has_qtwidget_import = True
                     news.append(txt)
                 if pr:
                     stpr = "".join([parts[0].replace('PySide.QtGui ',
-                                'PySide2.QtPrintSupport import '), ', '.join(pr)])
+                                '{0}.QtPrintSupport import '.format(self.newMod)), ', '.join(pr)])
                     txt = self.reindent_import_line(stpr)
                     news.append(txt)
                 if md:
                     stmd = "".join([parts[0].replace('PySide.QtGui ',
-                                'PySide2.QtMultimedia import '), ', '.join(md)])
+                                '{0}.QtMultimedia import '.format(self.newMod)), ', '.join(md)])
                     txt = self.reindent_import_line(stmd)
                     news.append(txt)
                 set_qstandardpaths(line.split('.QtGui')[0])
@@ -1976,18 +1986,18 @@ class PySideToPySide2(object):
                 parts = line.split('import ')
                 wb, wdg = self.sort_qtwebkit_classes(parts[1])
                 if wb:
-                    chain = "".join([parts[0].replace('PySide', 'PySide2'),
+                    chain = "".join([parts[0].replace('PySide', '{0}'.format(self.newMod)),
                                 'import ', ', '.join(wb)])
                     txt = self.reindent_import_line(chain)
                     news.append(txt)
                 if wdg:
                     chain = "".join([parts[0].replace('PySide.QtWebKit',
-                                'PySide2.QtWebKitWidgets'), 'import ', ', '.join(wdg)])
+                                '{0}.QtWebKitWidgets'.format(self.newMod)), 'import ', ', '.join(wdg)])
                     txt = self.reindent_import_line(chain)
                     news.append(txt)
 
             else:
-                line = line.replace('PySide', 'PySide2')
+                line = line.replace('PySide', '{0}'.format(self.newMod))
                 news.append(line)
 
             count += 1
@@ -2001,7 +2011,7 @@ class PySideToPySide2(object):
         line -- the line
         """
         parts = line.split('import ')
-        chain = parts[0].replace('PySide', 'PySide2') + 'import '
+        chain = parts[0].replace('PySide', '{0}'.format(self.newMod)) + 'import '
         end = parts[1].replace('(', '').replace(')', '').replace('\\', '')
         modules = set([name.strip() for name in end.split(',')])
 
@@ -2521,7 +2531,7 @@ class Main(object):
     
     # Brendan Kelly: IDE version
     #
-    def __init__(self, path, o=None):
+    def __init__(self, path, o=None, backwardsCompatible=False):
         self.copied = {}
         self.path = path
         self.nosubdir = False
@@ -2529,14 +2539,15 @@ class Main(object):
         if o:
             self.destdir = o
         else:
-            self.destdir = path.replace(".py", "Pyside2.py")
+            self.destdir = path.replace(".py", "2.py")
         self.write_diff = False
         self.write_diffs = False
         self.filename_diff = False
         self.nopyside2 = False
         self.log = None
 
-        self.prepare_changes(self.followlinks)
+        # ONLY use backwards compatible if you have the Qt.py module
+        self.prepare_changes(self.followlinks, backwardsCompatible)
     
 
     def is_python_file(self, path):
@@ -2568,7 +2579,7 @@ class Main(object):
 
         return False
 
-    def prepare_changes(self, followlinks=False):
+    def prepare_changes(self, followlinks=False, backCompat=False):
         ver = "PySide" if self.nopyside2 else "PySide2"
 
         if os.path.isdir(self.path):
@@ -2577,7 +2588,7 @@ class Main(object):
 
             self.copy_dir(self.destdir, self.path, followlinks=followlinks)
             self.set_diff_option('dir')
-            self.process_from_dir(self.destdir, followlinks=followlinks)
+            self.process_from_dir(self.destdir, followlinks=followlinks, backCompat=backCompat)
 
         elif os.path.isfile(self.path):
             if not self.is_python_file(self.path):
@@ -2588,7 +2599,7 @@ class Main(object):
 
                 self.copy_files(self.destdir, subdirs, files)
                 self.set_diff_option('dir')
-                self.process_from_dir(self.destdir, followlinks=followlinks)
+                self.process_from_dir(self.destdir, followlinks=followlinks, backCompat=backCompat)
 
             else:
                 if self.destdir == self.path:
@@ -2597,17 +2608,17 @@ class Main(object):
 
                 if self.write_diff:
                     self.set_diff_option('file')
-                cnv = PySideToPySide2(self.path, self.destdir, self.log, self.nopyside2)
+                cnv = PySideToPySide2(self.path, self.destdir, self.log, self.nopyside2, backCompat)
                 cnv.setup()
                 self.write_diff_file(self.destdir, self.path)
 
-    def process_from_dir(self, fld, followlinks=False):
+    def process_from_dir(self, fld, followlinks=False, backCompat=False):
         self.print_('Beginning into: %s\n' % fld)
         for root, _, files in os.walk(fld, followlinks=followlinks):
             files.sort()
             for f in files:
                 fname = os.path.join(root, f)
-                cnv = PySideToPySide2(fname, fname, self.log, self.nopyside2)
+                cnv = PySideToPySide2(fname, fname, self.log, self.nopyside2, backCompat)
                 cnv.setup()
                 self.write_diff_file(fname)
 
